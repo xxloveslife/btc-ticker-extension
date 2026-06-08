@@ -2,9 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   formatBadgePrice, formatPrice, formatPct, formatFunding,
-  fundingCountdown, isStale, klinesToCandles,
+  fundingCountdown, isStale,
 } from '../format.js';
-import { priceToY } from '../chart.js';
 
 test('formatBadgePrice scales to <=4 chars', () => {
   assert.equal(formatBadgePrice(68432.5), '68.4');
@@ -39,16 +38,4 @@ test('isStale respects threshold', () => {
   assert.equal(isStale(1000, 2000, 10000), false);
   assert.equal(isStale(1000, 20000, 10000), true);
   assert.equal(isStale(0, 5000), true);
-});
-
-test('priceToY maps range (high price -> top)', () => {
-  assert.equal(priceToY(100, 100, 200, 0, 100), 100); // min -> bottom
-  assert.equal(priceToY(200, 100, 200, 0, 100), 0);   // max -> top
-  assert.equal(priceToY(150, 100, 200, 0, 100), 50);
-});
-
-test('klinesToCandles maps OHLC fields', () => {
-  const raw = [[1, '10', '12', '9', '11', 'vol', 99]];
-  const c = klinesToCandles(raw)[0];
-  assert.deepEqual([c.t, c.o, c.h, c.l, c.c], [1, 10, 12, 9, 11]);
 });

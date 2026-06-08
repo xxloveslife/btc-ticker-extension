@@ -54,9 +54,3 @@ export function fundingCountdown(nextMs, nowMs) {
 export function isStale(updatedAt, nowMs, thresholdMs = 10000) {
   return !updatedAt || (nowMs - updatedAt) > thresholdMs;
 }
-
-// Binance REST kline rows -> {t,o,h,l,c} candles.
-export function klinesToCandles(raw) {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((k) => ({ t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4] }));
-}

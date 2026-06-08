@@ -1,8 +1,7 @@
 import {
-  formatPrice, formatPct, formatFunding, fundingCountdown,
-  klinesToCandles, isStale,
+  formatPrice, formatPct, formatFunding, fundingCountdown, isStale,
 } from './format.js';
-import { drawCandles } from './chart.js';
+// LightweightCharts is loaded as a global by vendor/lightweight-charts...js (classic script).
 
 // Standard candle intervals (like any trading app), each showing ~120 candles.
 const TF = {
@@ -80,9 +79,33 @@ async function loadRestSnapshot() {
   } catch {}
 }
 
+let chart = null;
+let series = null;
+
+// Create the interactive TradingView lightweight chart once.
+// Scroll = zoom time axis, drag = pan, drag price axis = scale high/low,
+// double-click price axis = reset autoscale, crosshair shows OHLC.
+function ensureChart() {
+  if (chart) return;
+  const el = $('chart');
+  chart = LightweightCharts.createChart(el, {
+    width: el.clientWidth,
+    height: el.clientHeight,
+    layout: { background: { color: '#11151c' }, textColor: '#8b95a1', fontSize: 11 },
+    grid: { vertLines: { color: '#1b222c' }, horzLines: { color: '#1b222c' } },
+    rightPriceScale: { borderColor: '#2a3441' },
+    timeScale: { borderColor: '#2a3441', timeVisible: true, secondsVisible: false },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+  });
+  series = chart.addCandlestickSeries({
+    upColor: '#0ecb81', downColor: '#f6465d',
+    wickUpColor: '#0ecb81', wickDownColor: '#f6465d',
+    borderVisible: false,
+  });
+}
+
 async function loadChart(tf) {
   const cfg = TF[tf];
-  const canvas = $('chart');
   const msg = $('chartMsg');
   msg.style.display = 'none';
   try {
@@ -90,8 +113,13 @@ async function loadChart(tf) {
     const res = await fetch(url);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const raw = await res.json();
-    const candles = klinesToCandles(raw);
-    requestAnimationFrame(() => drawCandles(canvas, candles));
+    ensureChart();
+    const data = raw.map((k) => ({
+      time: Math.floor(k[0] / 1000), // ms -> UTCTimestamp seconds
+      open: +k[1], high: +k[2], low: +k[3], close: +k[4],
+    }));
+    series.setData(data);
+    chart.timeScale().fitContent();
   } catch (e) {
     msg.textContent = '图表加载失败,点击重试';
     msg.style.display = 'flex';
