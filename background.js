@@ -18,7 +18,7 @@ let reconnectDelay = 1000; // exponential backoff, capped at 30s
 let snap = {
   price: null, changePct: null, high: null, low: null,
   fundingRate: null, nextFundingTime: null, markPrice: null,
-  updatedAt: 0, connected: false,
+  updatedAt: 0, connected: false, source: null, // source: 'ws' | 'rest'
 };
 
 function persist() {
@@ -47,7 +47,8 @@ function applyBadge() {
   chrome.action.setTitle({ title: lines.join('\n') });
 }
 
-function commit() {
+function commit(source) {
+  snap.source = source;
   snap.updatedAt = Date.now();
   snap.connected = true;
   applyBadge();
@@ -74,7 +75,7 @@ function handleMessage(ev) {
     snap.nextFundingTime = data.T;
     if (snap.price == null && isFinite(snap.markPrice)) snap.price = snap.markPrice;
   }
-  commit();
+  commit('ws');
 }
 
 function connect() {
@@ -119,7 +120,7 @@ async function pollRest() {
     snap.fundingRate = parseFloat(p.lastFundingRate);
     snap.nextFundingTime = p.nextFundingTime;
     snap.markPrice = parseFloat(p.markPrice);
-    commit();
+    commit('rest');
   } catch (e) {
     applyBadge();
   }

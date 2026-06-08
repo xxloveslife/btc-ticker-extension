@@ -35,6 +35,9 @@ body {
 }
 .dot.live { background: #0ecb81; }
 
+.src { font-size: 10px; color: #8b95a1; }
+.src.ws { color: #0ecb81; }
+
 .price {
   font-size: 30px;
   font-weight: 700;

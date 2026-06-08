@@ -18,8 +18,13 @@ const PREMIUM_URL = 'https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSD
 
 let currentTf = '15m';
 let snap = null;
+let lastWsAt = 0; // when the background last pushed a WS-sourced snapshot
 
 const $ = (id) => document.getElementById(id);
+
+function wsLive() {
+  return Date.now() - lastWsAt < 6000;
+}
 
 function renderSnap() {
   if (!snap) return;
@@ -37,8 +42,11 @@ function renderSnap() {
   if (snap.high != null) $('high').textContent = '$' + formatPrice(snap.high);
   if (snap.low != null) $('low').textContent = '$' + formatPrice(snap.low);
 
-  const live = !isStale(snap.updatedAt, Date.now());
-  $('dot').className = 'dot' + (live ? ' live' : '');
+  const fresh = !isStale(snap.updatedAt, Date.now());
+  $('dot').className = 'dot' + (fresh ? ' live' : '');
+  const src = $('src');
+  if (wsLive()) { src.textContent = 'WS实时'; src.className = 'src ws'; }
+  else { src.textContent = '轮询5s'; src.className = 'src'; }
 }
 
 function renderCountdown() {
@@ -50,6 +58,7 @@ function renderCountdown() {
 // REST refresh so the header always shows fresh data even if the background WS
 // is down. Runs every 5s while the popup is open; WS pushes (below) interleave.
 async function loadRestSnapshot() {
+  if (wsLive()) return; // WS is feeding live data; skip the redundant poll
   try {
     const [t, p] = await Promise.all([
       fetch(TICKER_URL).then((r) => r.json()),
@@ -115,6 +124,7 @@ async function init() {
     if (area === 'session' && changes.snap && changes.snap.newValue) {
       const v = changes.snap.newValue;
       if (v.price != null && (!snap || v.updatedAt >= snap.updatedAt)) {
+        if (v.source === 'ws') lastWsAt = Date.now();
         snap = v;
         renderSnap();
       }
