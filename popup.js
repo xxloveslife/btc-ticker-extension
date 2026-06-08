@@ -4,13 +4,19 @@ import {
 } from './format.js';
 import { drawCandles } from './chart.js';
 
+// Standard candle intervals (like any trading app), each showing ~120 candles.
 const TF = {
-  '1H': { interval: '1m', limit: 60 },
-  '1D': { interval: '15m', limit: 96 },
-  '1W': { interval: '1h', limit: 168 },
+  '5m':  { interval: '5m',  limit: 120 },
+  '15m': { interval: '15m', limit: 120 },
+  '1h':  { interval: '1h',  limit: 120 },
+  '4h':  { interval: '4h',  limit: 120 },
+  '1d':  { interval: '1d',  limit: 120 },
 };
 
-let currentTf = '1D';
+const TICKER_URL = 'https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=BTCUSDT';
+const PREMIUM_URL = 'https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT';
+
+let currentTf = '15m';
 let snap = null;
 
 const $ = (id) => document.getElementById(id);
@@ -31,7 +37,7 @@ function renderSnap() {
   if (snap.high != null) $('high').textContent = '$' + formatPrice(snap.high);
   if (snap.low != null) $('low').textContent = '$' + formatPrice(snap.low);
 
-  const live = snap.connected && !isStale(snap.updatedAt, Date.now());
+  const live = !isStale(snap.updatedAt, Date.now());
   $('dot').className = 'dot' + (live ? ' live' : '');
 }
 
@@ -39,6 +45,30 @@ function renderCountdown() {
   if (snap && snap.nextFundingTime) {
     $('countdown').textContent = fundingCountdown(snap.nextFundingTime, Date.now());
   }
+}
+
+// REST refresh so the header always shows fresh data even if the background WS
+// is down. Runs every 5s while the popup is open; WS pushes (below) interleave.
+async function loadRestSnapshot() {
+  try {
+    const [t, p] = await Promise.all([
+      fetch(TICKER_URL).then((r) => r.json()),
+      fetch(PREMIUM_URL).then((r) => r.json()),
+    ]);
+    snap = {
+      price: parseFloat(t.lastPrice),
+      changePct: parseFloat(t.priceChangePercent),
+      high: parseFloat(t.highPrice),
+      low: parseFloat(t.lowPrice),
+      fundingRate: parseFloat(p.lastFundingRate),
+      nextFundingTime: p.nextFundingTime,
+      markPrice: parseFloat(p.markPrice),
+      updatedAt: Date.now(),
+      connected: true,
+    };
+    renderSnap();
+    renderCountdown();
+  } catch {}
 }
 
 async function loadChart(tf) {
@@ -74,21 +104,28 @@ function initTabs() {
 async function init() {
   initTabs();
 
-  // Instant render from the background's cached snapshot.
+  // 1) instant render from the background's cached snapshot, if any
   try {
     const { snap: s } = await chrome.storage.session.get('snap');
-    if (s) { snap = s; renderSnap(); renderCountdown(); }
+    if (s && s.price != null) { snap = s; renderSnap(); renderCountdown(); }
   } catch {}
 
-  // Live updates while the popup is open.
+  // 2) live WS updates from the background, applied when they're fresher
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'session' && changes.snap) {
-      snap = changes.snap.newValue;
-      renderSnap();
+    if (area === 'session' && changes.snap && changes.snap.newValue) {
+      const v = changes.snap.newValue;
+      if (v.price != null && (!snap || v.updatedAt >= snap.updatedAt)) {
+        snap = v;
+        renderSnap();
+      }
     }
   });
 
+  // 3) REST refresh now + every 5s (header always fresh even if wss is blocked)
+  loadRestSnapshot();
+  setInterval(loadRestSnapshot, 5000);
   setInterval(renderCountdown, 1000);
+
   loadChart(currentTf);
 }
 
