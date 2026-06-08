@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "BTC 永续行情",
+  "version": "0.1.0",
+  "description": "Binance BTCUSDT 永续合约实时行情:图标角标常驻价格,悬停看详情,点击看迷你K线。",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "BTC 永续行情(加载中…)",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": ["alarms", "storage"],
+  "host_permissions": [
+    "https://fapi.binance.com/*",
+    "https://fstream.binance.com/*"
+  ]
+}

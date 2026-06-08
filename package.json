@@ -1,0 +1,11 @@
+{
+  "name": "btc-ticker-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Chrome MV3 extension showing live Binance BTCUSDT perpetual quotes.",
+  "scripts": {
+    "test": "node --test",
+    "icons": "python gen_icons.py"
+  }
+}

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="header">
+    <div class="sym">
+      BTCUSDT <span class="perp">永续</span><span id="dot" class="dot"></span>
+    </div>
+    <div class="price" id="price">--</div>
+    <div class="change" id="change">--</div>
+  </div>
+
+  <div class="tf" id="tf">
+    <button data-tf="1H">1H</button>
+    <button data-tf="1D" class="active">1D</button>
+    <button data-tf="1W">1W</button>
+  </div>
+
+  <div class="chartwrap">
+    <canvas id="chart"></canvas>
+    <div class="chart-msg" id="chartMsg"></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><span class="k">资金费率</span><span class="v" id="funding">--</span></div>
+    <div class="stat"><span class="k">结算</span><span class="v" id="countdown">--</span></div>
+    <div class="stat"><span class="k">24h 高</span><span class="v" id="high">--</span></div>
+    <div class="stat"><span class="k">24h 低</span><span class="v" id="low">--</span></div>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
