@@ -85,10 +85,11 @@ function connect() {
     scheduleReconnect();
     return;
   }
-  ws.onopen = () => { reconnectDelay = 1000; };
+  ws.onopen = () => { console.log('[btc] ws open'); reconnectDelay = 1000; };
   ws.onmessage = handleMessage;
-  ws.onerror = () => { try { ws.close(); } catch {} };
-  ws.onclose = () => {
+  ws.onerror = () => { console.log('[btc] ws error'); try { ws.close(); } catch {} };
+  ws.onclose = (e) => {
+    console.log('[btc] ws close', e && e.code, e && e.reason);
     applyBadge();
     scheduleReconnect();
   };
@@ -107,22 +108,42 @@ function ensureConnected() {
 
 // ---- REST poll (fallback when wss is blocked or the WS is stale) ----
 
+// Merge a REST ticker + premiumIndex pair into the snapshot.
+function applyQuote(t, p) {
+  snap.price = parseFloat(t.lastPrice);
+  snap.changePct = parseFloat(t.priceChangePercent);
+  snap.high = parseFloat(t.highPrice);
+  snap.low = parseFloat(t.lowPrice);
+  snap.fundingRate = parseFloat(p.lastFundingRate);
+  snap.nextFundingTime = p.nextFundingTime;
+  snap.markPrice = parseFloat(p.markPrice);
+  commit('rest');
+}
+
 async function pollRest() {
   try {
     const [t, p] = await Promise.all([
       fetch(TICKER_URL).then((r) => r.json()),
       fetch(PREMIUM_URL).then((r) => r.json()),
     ]);
-    snap.price = parseFloat(t.lastPrice);
-    snap.changePct = parseFloat(t.priceChangePercent);
-    snap.high = parseFloat(t.highPrice);
-    snap.low = parseFloat(t.lowPrice);
-    snap.fundingRate = parseFloat(p.lastFundingRate);
-    snap.nextFundingTime = p.nextFundingTime;
-    snap.markPrice = parseFloat(p.markPrice);
-    commit('rest');
+    applyQuote(t, p);
   } catch (e) {
     applyBadge();
+  }
+}
+
+// Offscreen document keeps polling every few seconds (the service worker sleeps,
+// it doesn't), so the badge + hover tooltip stay fresh without the WebSocket.
+async function ensureOffscreen() {
+  try {
+    if (await chrome.offscreen.hasDocument()) return;
+    await chrome.offscreen.createDocument({
+      url: 'offscreen.html',
+      reasons: ['WORKERS'],
+      justification: 'Poll Binance REST every few seconds to keep the toolbar badge and tooltip fresh.',
+    });
+  } catch (e) {
+    // createDocument throws if one already exists — safe to ignore.
   }
 }
 
@@ -132,6 +153,7 @@ async function pollRest() {
 chrome.alarms.create('keepalive', { periodInMinutes: 0.5 });
 chrome.alarms.onAlarm.addListener(() => {
   ensureConnected();
+  ensureOffscreen(); // recreate the poller if it was torn down
   if (isStale(snap.updatedAt, Date.now(), STALE_MS)) pollRest();
   applyBadge();
 });
@@ -139,13 +161,15 @@ chrome.alarms.onAlarm.addListener(() => {
 chrome.runtime.onInstalled.addListener(ensureConnected);
 chrome.runtime.onStartup.addListener(ensureConnected);
 
-// Explicit fallback for the popup if storage.session is empty.
 chrome.runtime.onMessage.addListener((req, _sender, sendResponse) => {
-  if (req && req.type === 'getSnap') sendResponse({ snap });
+  if (req && req.type === 'quote') { applyQuote(req.t, req.p); return false; }
+  if (req && req.type === 'getSnap') { sendResponse({ snap }); return false; }
   return false;
 });
 
-// Kick off on every worker start: immediate REST snapshot + open the WS.
+// Kick off on every worker start: immediate REST snapshot, start the offscreen
+// poller, and try the WS (which takes over at ~1s if it ever connects).
 ensureConnected();
+ensureOffscreen();
 pollRest();
 applyBadge();

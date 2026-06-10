@@ -23,7 +23,7 @@
     "service_worker": "background.js",
     "type": "module"
   },
-  "permissions": ["alarms", "storage"],
+  "permissions": ["alarms", "storage", "offscreen"],
   "host_permissions": [
     "https://fapi.binance.com/*",
     "https://fstream.binance.com/*"
