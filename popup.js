@@ -15,7 +15,7 @@ const TF = {
 const TICKER_URL = 'https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=BTCUSDT';
 const PREMIUM_URL = 'https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT';
 
-let currentTf = '15m';
+let currentTf = '5m';
 let snap = null;
 let lastWsAt = 0; // when the background last pushed a WS-sourced snapshot
 
