@@ -66,6 +66,15 @@ body {
 
 .chartwrap { position: relative; height: 170px; }
 #chart { width: 100%; height: 170px; }
+.legend {
+  position: absolute;
+  top: 2px;
+  left: 6px;
+  font-size: 10px;
+  color: #f0b90b;
+  z-index: 2;
+  pointer-events: none;
+}
 .chart-msg {
   position: absolute;
   inset: 0;

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   formatBadgePrice, formatPrice, formatPct, formatFunding,
-  fundingCountdown, isStale,
+  fundingCountdown, isStale, computeEMA,
 } from '../format.js';
 
 test('formatBadgePrice scales to <=4 chars', () => {
@@ -38,4 +38,17 @@ test('isStale respects threshold', () => {
   assert.equal(isStale(1000, 2000, 10000), false);
   assert.equal(isStale(1000, 20000, 10000), true);
   assert.equal(isStale(0, 5000), true);
+});
+
+test('computeEMA seeds with SMA then smooths', () => {
+  const out = computeEMA([1, 2, 3, 4, 5], 3);
+  assert.equal(out[0], null);
+  assert.equal(out[1], null);
+  assert.equal(out[2], 2); // SMA(1,2,3)
+  assert.equal(out[3], 3); // 4*0.5 + 2*0.5
+  assert.equal(out[4], 4); // 5*0.5 + 3*0.5
+});
+
+test('computeEMA returns nulls when not enough data', () => {
+  assert.deepEqual(computeEMA([1, 2], 3), [null, null]);
 });

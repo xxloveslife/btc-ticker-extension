@@ -54,3 +54,21 @@ export function fundingCountdown(nextMs, nowMs) {
 export function isStale(updatedAt, nowMs, thresholdMs = 10000) {
   return !updatedAt || (nowMs - updatedAt) > thresholdMs;
 }
+
+// Exponential moving average over `values`, seeded with the SMA of the first
+// `period` points. Returns an array the same length as values; entries before
+// enough data are null (so the line starts once it's meaningful).
+export function computeEMA(values, period) {
+  const out = new Array(Array.isArray(values) ? values.length : 0).fill(null);
+  if (!Array.isArray(values) || period <= 0 || values.length < period) return out;
+  const k = 2 / (period + 1);
+  let sma = 0;
+  for (let i = 0; i < period; i++) sma += values[i];
+  let prev = sma / period;
+  out[period - 1] = prev;
+  for (let i = period; i < values.length; i++) {
+    prev = values[i] * k + prev * (1 - k);
+    out[i] = prev;
+  }
+  return out;
+}

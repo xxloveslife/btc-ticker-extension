@@ -1,5 +1,5 @@
 import {
-  formatPrice, formatPct, formatFunding, fundingCountdown, isStale,
+  formatPrice, formatPct, formatFunding, fundingCountdown, isStale, computeEMA,
 } from './format.js';
 // LightweightCharts is loaded as a global by vendor/lightweight-charts...js (classic script).
 
@@ -81,6 +81,8 @@ async function loadRestSnapshot() {
 
 let chart = null;
 let series = null;
+let emaSeries = null;
+const EMA_PERIOD = 20;
 
 // Create the interactive TradingView lightweight chart once.
 // Scroll = zoom time axis, drag = pan, drag price axis = scale high/low,
@@ -102,6 +104,13 @@ function ensureChart() {
     wickUpColor: '#0ecb81', wickDownColor: '#f6465d',
     borderVisible: false,
   });
+  emaSeries = chart.addLineSeries({
+    color: '#f0b90b', // Binance gold
+    lineWidth: 2,
+    priceLineVisible: false,
+    lastValueVisible: false,
+    crosshairMarkerVisible: false,
+  });
 }
 
 async function loadChart(tf) {
@@ -119,6 +128,15 @@ async function loadChart(tf) {
       open: +k[1], high: +k[2], low: +k[3], close: +k[4],
     }));
     series.setData(data);
+
+    // EMA20 over this timeframe's closes — recomputed on every timeframe switch.
+    const ema = computeEMA(data.map((d) => d.close), EMA_PERIOD);
+    const emaData = [];
+    for (let i = 0; i < data.length; i++) {
+      if (ema[i] != null) emaData.push({ time: data[i].time, value: ema[i] });
+    }
+    emaSeries.setData(emaData);
+
     chart.timeScale().fitContent();
   } catch (e) {
     msg.textContent = '图表加载失败,点击重试';
