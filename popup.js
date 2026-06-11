@@ -106,7 +106,7 @@ function ensureChart() {
   });
   emaSeries = chart.addLineSeries({
     color: '#f0b90b', // Binance gold
-    lineWidth: 2,
+    lineWidth: 1,
     priceLineVisible: false,
     lastValueVisible: false,
     crosshairMarkerVisible: false,
