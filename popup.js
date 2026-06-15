@@ -3,6 +3,9 @@ import {
 } from './format.js';
 // LightweightCharts is loaded as a global by vendor/lightweight-charts...js (classic script).
 
+const SYMBOLS = { BTCUSDT: 'BTC', XAUUSDT: 'XAU' };
+const DEFAULT_SYMBOL = 'BTCUSDT';
+
 // Standard candle intervals (like any trading app), each showing ~120 candles.
 const TF = {
   '5m':  { interval: '5m',  limit: 120 },
@@ -12,12 +15,20 @@ const TF = {
   '1d':  { interval: '1d',  limit: 120 },
 };
 
-const TICKER_URL = 'https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=BTCUSDT';
-const PREMIUM_URL = 'https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT';
+const tickerUrl = (s) => `https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=${s}`;
+const premiumUrl = (s) => `https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${s}`;
+const klinesUrl = (s, interval, limit) =>
+  `https://fapi.binance.com/fapi/v1/klines?symbol=${s}&interval=${interval}&limit=${limit}`;
 
+let currentSymbol = DEFAULT_SYMBOL;
 let currentTf = '5m';
 let snap = null;
-let lastWsAt = 0; // when the background last pushed a WS-sourced snapshot
+let lastWsAt = 0;
+
+const EMA_PERIOD = 20;
+let chart = null;
+let series = null;
+let emaSeries = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -54,16 +65,27 @@ function renderCountdown() {
   }
 }
 
+function clearHeader() {
+  $('price').textContent = '--';
+  $('change').textContent = '--'; $('change').className = 'change';
+  $('funding').textContent = '--'; $('funding').className = 'v';
+  $('countdown').textContent = '--';
+  $('high').textContent = '--'; $('low').textContent = '--';
+}
+
 // REST refresh so the header always shows fresh data even if the background WS
-// is down. Runs every 5s while the popup is open; WS pushes (below) interleave.
+// is down. Runs every 5s while the popup is open; WS pushes interleave.
 async function loadRestSnapshot() {
-  if (wsLive()) return; // WS is feeding live data; skip the redundant poll
+  if (wsLive()) return;
+  const sym = currentSymbol;
   try {
     const [t, p] = await Promise.all([
-      fetch(TICKER_URL).then((r) => r.json()),
-      fetch(PREMIUM_URL).then((r) => r.json()),
+      fetch(tickerUrl(sym)).then((r) => r.json()),
+      fetch(premiumUrl(sym)).then((r) => r.json()),
     ]);
+    if (sym !== currentSymbol) return; // user switched mid-fetch
     snap = {
+      symbol: sym,
       price: parseFloat(t.lastPrice),
       changePct: parseFloat(t.priceChangePercent),
       high: parseFloat(t.highPrice),
@@ -79,14 +101,6 @@ async function loadRestSnapshot() {
   } catch {}
 }
 
-let chart = null;
-let series = null;
-let emaSeries = null;
-const EMA_PERIOD = 20;
-
-// Create the interactive TradingView lightweight chart once.
-// Scroll = zoom time axis, drag = pan, drag price axis = scale high/low,
-// double-click price axis = reset autoscale, crosshair shows OHLC.
 function ensureChart() {
   if (chart) return;
   const el = $('chart');
@@ -113,23 +127,22 @@ function ensureChart() {
   });
 }
 
-async function loadChart(tf) {
+async function loadChart(sym, tf) {
   const cfg = TF[tf];
   const msg = $('chartMsg');
   msg.style.display = 'none';
   try {
-    const url = `https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=${cfg.interval}&limit=${cfg.limit}`;
-    const res = await fetch(url);
+    const res = await fetch(klinesUrl(sym, cfg.interval, cfg.limit));
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const raw = await res.json();
+    if (sym !== currentSymbol || tf !== currentTf) return; // switched mid-fetch
     ensureChart();
     const data = raw.map((k) => ({
-      time: Math.floor(k[0] / 1000), // ms -> UTCTimestamp seconds
+      time: Math.floor(k[0] / 1000),
       open: +k[1], high: +k[2], low: +k[3], close: +k[4],
     }));
     series.setData(data);
 
-    // EMA20 over this timeframe's closes — recomputed on every timeframe switch.
     const ema = computeEMA(data.map((d) => d.close), EMA_PERIOD);
     const emaData = [];
     for (let i = 0; i < data.length; i++) {
@@ -144,32 +157,60 @@ async function loadChart(tf) {
   }
 }
 
-function initTabs() {
-  const tf = $('tf');
-  tf.addEventListener('click', (e) => {
+function setActive(barId, predicate) {
+  [...$(barId).querySelectorAll('button')].forEach((b) => b.classList.toggle('active', predicate(b)));
+}
+
+function switchSymbol(sym) {
+  if (sym === currentSymbol) return;
+  currentSymbol = sym;
+  setActive('symbar', (b) => b.dataset.sym === sym);
+  chrome.storage.local.set({ symbol: sym }); // background + offscreen follow this
+  snap = null;
+  lastWsAt = 0;
+  clearHeader();
+  loadRestSnapshot();
+  loadChart(currentSymbol, currentTf);
+}
+
+function initBars() {
+  $('symbar').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (b) switchSymbol(b.dataset.sym);
+  });
+  $('tf').addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
     currentTf = b.dataset.tf;
-    [...tf.querySelectorAll('button')].forEach((x) => x.classList.toggle('active', x === b));
-    loadChart(currentTf);
+    setActive('tf', (x) => x === b);
+    loadChart(currentSymbol, currentTf);
   });
-  $('chartMsg').addEventListener('click', () => loadChart(currentTf));
+  $('chartMsg').addEventListener('click', () => loadChart(currentSymbol, currentTf));
 }
 
 async function init() {
-  initTabs();
+  initBars();
 
-  // 1) instant render from the background's cached snapshot, if any
+  // restore saved symbol
+  try {
+    const { symbol } = await chrome.storage.local.get('symbol');
+    if (symbol && SYMBOLS[symbol]) currentSymbol = symbol;
+  } catch {}
+  setActive('symbar', (b) => b.dataset.sym === currentSymbol);
+
+  // instant render from the background's cached snapshot (same symbol only)
   try {
     const { snap: s } = await chrome.storage.session.get('snap');
-    if (s && s.price != null) { snap = s; renderSnap(); renderCountdown(); }
+    if (s && s.price != null && s.symbol === currentSymbol) {
+      snap = s; renderSnap(); renderCountdown();
+    }
   } catch {}
 
-  // 2) live WS updates from the background, applied when they're fresher
+  // live updates from the background, applied when fresher and same symbol
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'session' && changes.snap && changes.snap.newValue) {
       const v = changes.snap.newValue;
-      if (v.price != null && (!snap || v.updatedAt >= snap.updatedAt)) {
+      if (v.symbol === currentSymbol && v.price != null && (!snap || v.updatedAt >= snap.updatedAt)) {
         if (v.source === 'ws') lastWsAt = Date.now();
         snap = v;
         renderSnap();
@@ -177,12 +218,11 @@ async function init() {
     }
   });
 
-  // 3) REST refresh now + every 5s (header always fresh even if wss is blocked)
   loadRestSnapshot();
   setInterval(loadRestSnapshot, 5000);
   setInterval(renderCountdown, 1000);
 
-  loadChart(currentTf);
+  loadChart(currentSymbol, currentTf);
 }
 
 init();

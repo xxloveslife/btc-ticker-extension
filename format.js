@@ -10,9 +10,9 @@ export const STALE = '#888888'; // grey when disconnected / data delayed
 //   68432.5 -> "68.4"   104210 -> "104k"   6842 -> "6.84"
 export function formatBadgePrice(price) {
   if (!isFinite(price) || price <= 0) return '—';
-  if (price >= 100000) return Math.round(price / 1000) + 'k';
-  if (price >= 10000) return (price / 1000).toFixed(1);
-  if (price >= 1000) return (price / 1000).toFixed(2);
+  if (price >= 100000) return Math.round(price / 1000) + 'k'; // 104k
+  if (price >= 10000) return (price / 1000).toFixed(1);        // 68.4 (BTC)
+  if (price >= 1000) return String(Math.round(price));         // 4310 (XAU)
   if (price >= 1) return price.toFixed(0);
   return price.toPrecision(2);
 }

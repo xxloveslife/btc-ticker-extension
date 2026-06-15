@@ -6,9 +6,10 @@ import {
 } from '../format.js';
 
 test('formatBadgePrice scales to <=4 chars', () => {
-  assert.equal(formatBadgePrice(68432.5), '68.4');
+  assert.equal(formatBadgePrice(68432.5), '68.4'); // BTC
   assert.equal(formatBadgePrice(104210), '104k');
-  assert.equal(formatBadgePrice(6842), '6.84');
+  assert.equal(formatBadgePrice(4309.7), '4310');  // XAU/gold
+  assert.equal(formatBadgePrice(842), '842');
   assert.equal(formatBadgePrice(0), '—');
   assert.equal(formatBadgePrice(NaN), '—');
 });

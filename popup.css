@@ -10,13 +10,24 @@ body {
 
 .header { margin-bottom: 4px; }
 
-.sym {
+.toprow {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: #8b95a1;
+  justify-content: space-between;
 }
+.symbar { display: flex; gap: 4px; }
+.symbar button {
+  background: #1b222c;
+  color: #8b95a1;
+  border: 1px solid #2a3441;
+  border-radius: 5px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.symbar button.active { background: #2a3441; color: #fff; }
+.status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #8b95a1; }
 
 .perp {
   background: #2a3441;

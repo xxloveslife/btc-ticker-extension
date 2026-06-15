@@ -1,19 +1,19 @@
 // Runs inside the offscreen document (a normal page context that, unlike the
-// service worker, is not killed after 30s idle). It polls Binance REST every
-// few seconds and pushes each quote to the service worker, which updates the
-// toolbar badge + tooltip. This keeps the hover tooltip fresh-on-every-hover
-// without depending on the WebSocket.
-const TICKER_URL = 'https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=BTCUSDT';
-const PREMIUM_URL = 'https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT';
+// service worker, is not killed after 30s idle). It polls Binance REST for the
+// currently-selected symbol every few seconds and pushes each quote to the
+// service worker, keeping the badge + hover tooltip fresh without the WebSocket.
+const tickerUrl = (s) => `https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=${s}`;
+const premiumUrl = (s) => `https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${s}`;
 const POLL_MS = 3000;
 
 async function poll() {
   try {
+    const { symbol = 'BTCUSDT' } = await chrome.storage.local.get('symbol');
     const [t, p] = await Promise.all([
-      fetch(TICKER_URL).then((r) => r.json()),
-      fetch(PREMIUM_URL).then((r) => r.json()),
+      fetch(tickerUrl(symbol)).then((r) => r.json()),
+      fetch(premiumUrl(symbol)).then((r) => r.json()),
     ]);
-    chrome.runtime.sendMessage({ type: 'quote', t, p });
+    chrome.runtime.sendMessage({ type: 'quote', symbol, t, p });
   } catch (e) {
     // network blip; next tick will retry
   }

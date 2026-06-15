@@ -6,8 +6,14 @@
 </head>
 <body>
   <div class="header">
-    <div class="sym">
-      BTCUSDT <span class="perp">永续</span><span id="dot" class="dot"></span><span id="src" class="src"></span>
+    <div class="toprow">
+      <div class="symbar" id="symbar">
+        <button data-sym="BTCUSDT" class="active">BTC</button>
+        <button data-sym="XAUUSDT">XAU</button>
+      </div>
+      <div class="status">
+        <span class="perp">永续</span><span id="dot" class="dot"></span><span id="src" class="src"></span>
+      </div>
     </div>
     <div class="price" id="price">--</div>
     <div class="change" id="change">--</div>
