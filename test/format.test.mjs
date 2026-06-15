@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatBadgePrice, formatPrice, formatPct, formatFunding,
   fundingCountdown, isStale, computeEMA,
+  intervalToMs, candleCloseRemainingMs, formatDuration,
 } from '../format.js';
 
 test('formatBadgePrice scales to <=4 chars', () => {
@@ -52,4 +53,22 @@ test('computeEMA seeds with SMA then smooths', () => {
 
 test('computeEMA returns nulls when not enough data', () => {
   assert.deepEqual(computeEMA([1, 2], 3), [null, null]);
+});
+
+test('intervalToMs maps known intervals', () => {
+  assert.equal(intervalToMs('5m'), 300000);
+  assert.equal(intervalToMs('1d'), 86400000);
+  assert.equal(intervalToMs('nope'), 0);
+});
+
+test('candleCloseRemainingMs counts down to the next UTC-aligned boundary', () => {
+  assert.equal(candleCloseRemainingMs(300000, 300000 * 10 + 120000), 180000); // 2min in -> 3min left
+  assert.equal(candleCloseRemainingMs(300000, 300000 * 10), 300000); // on boundary -> full interval
+});
+
+test('formatDuration formats MM:SS and H:MM:SS', () => {
+  assert.equal(formatDuration(180000), '03:00');
+  assert.equal(formatDuration(225000), '03:45');
+  assert.equal(formatDuration(3 * 3600000 + 4 * 60000 + 5000), '3:04:05');
+  assert.equal(formatDuration(-5), '00:00');
 });

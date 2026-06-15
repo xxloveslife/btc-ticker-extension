@@ -1,5 +1,6 @@
 import {
   formatPrice, formatPct, formatFunding, fundingCountdown, isStale, computeEMA,
+  intervalToMs, candleCloseRemainingMs, formatDuration,
 } from './format.js';
 // LightweightCharts is loaded as a global by vendor/lightweight-charts...js (classic script).
 
@@ -63,6 +64,12 @@ function renderCountdown() {
   if (snap && snap.nextFundingTime) {
     $('countdown').textContent = fundingCountdown(snap.nextFundingTime, Date.now());
   }
+}
+
+// Time left until the current candle of the selected timeframe closes.
+function renderCandleCountdown() {
+  const ms = candleCloseRemainingMs(intervalToMs(TF[currentTf].interval), Date.now());
+  $('ccd').textContent = '收盘 ' + formatDuration(ms);
 }
 
 function clearHeader() {
@@ -183,6 +190,7 @@ function initBars() {
     if (!b) return;
     currentTf = b.dataset.tf;
     setActive('tf', (x) => x === b);
+    renderCandleCountdown();
     loadChart(currentSymbol, currentTf);
   });
   $('chartMsg').addEventListener('click', () => loadChart(currentSymbol, currentTf));
@@ -221,6 +229,8 @@ async function init() {
   loadRestSnapshot();
   setInterval(loadRestSnapshot, 5000);
   setInterval(renderCountdown, 1000);
+  renderCandleCountdown();
+  setInterval(renderCandleCountdown, 1000);
 
   loadChart(currentSymbol, currentTf);
 }

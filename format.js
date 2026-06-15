@@ -55,6 +55,28 @@ export function isStale(updatedAt, nowMs, thresholdMs = 10000) {
   return !updatedAt || (nowMs - updatedAt) > thresholdMs;
 }
 
+// Candle interval string -> milliseconds (the timeframes we support).
+export function intervalToMs(interval) {
+  const m = { '5m': 300000, '15m': 900000, '1h': 3600000, '4h': 14400000, '1d': 86400000 };
+  return m[interval] || 0;
+}
+
+// Time until the current candle closes. Binance candle boundaries are UTC-aligned
+// and each supported interval evenly divides the epoch, so this is exact.
+export function candleCloseRemainingMs(intervalMs, nowMs) {
+  if (!intervalMs) return 0;
+  return intervalMs - (nowMs % intervalMs);
+}
+
+// ms -> "MM:SS", or "H:MM:SS" once it exceeds an hour.
+export function formatDuration(ms) {
+  let s = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(s / 3600); s -= h * 3600;
+  const m = Math.floor(s / 60); const ss = s % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(ss)}` : `${pad(m)}:${pad(ss)}`;
+}
+
 // Exponential moving average over `values`, seeded with the SMA of the first
 // `period` points. Returns an array the same length as values; entries before
 // enough data are null (so the line starts once it's meaningful).

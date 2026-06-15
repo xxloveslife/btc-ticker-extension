@@ -86,6 +86,16 @@ body {
   z-index: 2;
   pointer-events: none;
 }
+.ccd {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  font-size: 10px;
+  color: #8b95a1;
+  font-variant-numeric: tabular-nums;
+  z-index: 2;
+  pointer-events: none;
+}
 .chart-msg {
   position: absolute;
   inset: 0;
