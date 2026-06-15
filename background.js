@@ -13,9 +13,13 @@ const SYMBOLS = {
 const DEFAULT_SYMBOL = 'BTCUSDT';
 const STALE_MS = 10000;
 
+const MAX_WS_FAILURES = 3; // give up on the WS after this many consecutive fails
+
 let symbol = DEFAULT_SYMBOL;
 let ws = null;
 let reconnectDelay = 1000; // exponential backoff, capped at 30s
+let wsFailures = 0;
+let wsDisabled = false; // proxy/network blocks wss -> stop retrying, use REST only
 
 function freshSnap(sym) {
   return {
@@ -92,18 +96,24 @@ function handleMessage(ev) {
 }
 
 function connect() {
+  if (wsDisabled) return;
   try {
     ws = new WebSocket(streamUrl(symbol));
   } catch (e) {
     scheduleReconnect();
     return;
   }
-  ws.onopen = () => { console.log('[btc] ws open', symbol); reconnectDelay = 1000; };
+  ws.onopen = () => { console.log('[btc] ws open', symbol); reconnectDelay = 1000; wsFailures = 0; };
   ws.onmessage = handleMessage;
-  ws.onerror = () => { console.log('[btc] ws error'); try { ws.close(); } catch {} };
-  ws.onclose = (e) => {
-    console.log('[btc] ws close', e && e.code, e && e.reason);
+  ws.onerror = () => { try { ws.close(); } catch {} };
+  ws.onclose = () => {
     applyBadge();
+    wsFailures += 1;
+    if (wsFailures >= MAX_WS_FAILURES) {
+      wsDisabled = true; // network blocks wss; REST + offscreen keep things fresh
+      console.log('[btc] WebSocket blocked here; falling back to REST polling (this is fine).');
+      return;
+    }
     scheduleReconnect();
   };
 }
@@ -115,6 +125,7 @@ function scheduleReconnect() {
 }
 
 function ensureConnected() {
+  if (wsDisabled) return;
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
   connect();
 }
