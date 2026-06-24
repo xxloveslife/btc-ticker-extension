@@ -8,6 +8,7 @@ import {
 
 const SYMBOLS = {
   BTCUSDT: { label: 'BTC' },
+  ETHUSDT: { label: 'ETH' },
   XAUUSDT: { label: 'XAU' },
 };
 const DEFAULT_SYMBOL = 'BTCUSDT';
