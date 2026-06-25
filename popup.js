@@ -151,6 +151,9 @@ async function loadChart(sym, tf) {
       if (myId !== chartLoadSeq) return;
 
       ensureChart();
+      const el = $('chart');
+      if (el.clientWidth) chart.resize(el.clientWidth, el.clientHeight); // size safety
+
       const data = raw.map((k) => ({
         time: Math.floor(k[0] / 1000),
         open: +k[1], high: +k[2], low: +k[3], close: +k[4],
@@ -164,6 +167,10 @@ async function loadChart(sym, tf) {
       }
       emaSeries.setData(emaData);
 
+      // Reset both axes — without this, a manually-dragged price scale stays
+      // pinned to the previous symbol's range and the new candles render
+      // off-screen (black chart), since fitContent() only fits the time axis.
+      chart.priceScale('right').applyOptions({ autoScale: true });
       chart.timeScale().fitContent();
       return; // success
     } catch (e) {
