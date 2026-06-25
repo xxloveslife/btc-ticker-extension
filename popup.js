@@ -30,8 +30,10 @@ const EMA_PERIOD = 20;
 let chart = null;
 let series = null;
 let emaSeries = null;
+let chartLoadSeq = 0; // only the latest loadChart() may render (race guard)
 
 const $ = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function wsLive() {
   return Date.now() - lastWsAt < 6000;
@@ -135,32 +137,45 @@ function ensureChart() {
 }
 
 async function loadChart(sym, tf) {
+  const myId = ++chartLoadSeq; // newest call wins; older in-flight loads abort
   const cfg = TF[tf];
   const msg = $('chartMsg');
   msg.style.display = 'none';
-  try {
-    const res = await fetch(klinesUrl(sym, cfg.interval, cfg.limit));
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const raw = await res.json();
-    if (sym !== currentSymbol || tf !== currentTf) return; // switched mid-fetch
-    ensureChart();
-    const data = raw.map((k) => ({
-      time: Math.floor(k[0] / 1000),
-      open: +k[1], high: +k[2], low: +k[3], close: +k[4],
-    }));
-    series.setData(data);
 
-    const ema = computeEMA(data.map((d) => d.close), EMA_PERIOD);
-    const emaData = [];
-    for (let i = 0; i < data.length; i++) {
-      if (ema[i] != null) emaData.push({ time: data[i].time, value: ema[i] });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(klinesUrl(sym, cfg.interval, cfg.limit));
+      if (myId !== chartLoadSeq) return; // superseded by a newer switch
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const raw = await res.json();
+      if (myId !== chartLoadSeq) return;
+
+      ensureChart();
+      const data = raw.map((k) => ({
+        time: Math.floor(k[0] / 1000),
+        open: +k[1], high: +k[2], low: +k[3], close: +k[4],
+      }));
+      series.setData(data);
+
+      const ema = computeEMA(data.map((d) => d.close), EMA_PERIOD);
+      const emaData = [];
+      for (let i = 0; i < data.length; i++) {
+        if (ema[i] != null) emaData.push({ time: data[i].time, value: ema[i] });
+      }
+      emaSeries.setData(emaData);
+
+      chart.timeScale().fitContent();
+      return; // success
+    } catch (e) {
+      if (myId !== chartLoadSeq) return; // superseded — stay quiet
+      if (attempt < 2) {
+        await sleep(350); // transient (proxy/timeout) — back off and retry
+        if (myId !== chartLoadSeq) return;
+      } else {
+        msg.textContent = '图表加载失败,点击重试';
+        msg.style.display = 'flex';
+      }
     }
-    emaSeries.setData(emaData);
-
-    chart.timeScale().fitContent();
-  } catch (e) {
-    msg.textContent = '图表加载失败,点击重试';
-    msg.style.display = 'flex';
   }
 }
 
