@@ -154,8 +154,11 @@ async function loadChart(sym, tf) {
       const el = $('chart');
       if (el.clientWidth) chart.resize(el.clientWidth, el.clientHeight); // size safety
 
+      // lightweight-charts renders time as UTC. Shift each timestamp by the local
+      // timezone offset so the axis + crosshair read in the user's local time
+      // (Beijing/UTC+8 here). Per-candle offset handles DST for non-CN zones too.
       const data = raw.map((k) => ({
-        time: Math.floor(k[0] / 1000),
+        time: Math.floor(k[0] / 1000) - new Date(k[0]).getTimezoneOffset() * 60,
         open: +k[1], high: +k[2], low: +k[3], close: +k[4],
       }));
       series.setData(data);
