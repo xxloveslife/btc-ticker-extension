@@ -4,7 +4,7 @@ import {
 } from './format.js';
 // LightweightCharts is loaded as a global by vendor/lightweight-charts...js (classic script).
 
-const SYMBOLS = { BTCUSDT: 'BTC', ETHUSDT: 'ETH', SOLUSDT: 'SOL', BNBUSDT: 'BNB', XAUUSDT: 'XAU' };
+const SYMBOLS = { BTCUSDT: 'BTC', ETHUSDT: 'ETH', SPCXUSDT: 'SPCX', BNBUSDT: 'BNB', XAUUSDT: 'XAU' };
 const DEFAULT_SYMBOL = 'BTCUSDT';
 
 // Standard candle intervals (like any trading app), each showing ~120 candles.
