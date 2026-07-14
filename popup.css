@@ -12,10 +12,11 @@ body {
 
 .toprow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 6px;
 }
-.symbar { display: flex; gap: 3px; }
+.symbar { display: flex; flex-wrap: wrap; gap: 3px; flex: 1; }
 .symbar button {
   background: #1b222c;
   color: #8b95a1;
@@ -27,7 +28,63 @@ body {
   cursor: pointer;
 }
 .symbar button.active { background: #2a3441; color: #fff; }
-.status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #8b95a1; }
+.symbar button.manage-toggle { color: #0ecb81; padding: 2px 8px; }
+.status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #8b95a1; white-space: nowrap; padding-top: 2px; }
+
+.manage {
+  margin: 8px 0 2px;
+  padding: 8px;
+  background: #161b23;
+  border: 1px solid #2a3441;
+  border-radius: 6px;
+}
+.addrow { display: flex; gap: 6px; }
+.addrow input {
+  flex: 1;
+  background: #11151c;
+  border: 1px solid #2a3441;
+  border-radius: 5px;
+  color: #e6e8ea;
+  font-size: 12px;
+  padding: 4px 8px;
+  outline: none;
+}
+.addrow input:focus { border-color: #0ecb81; }
+.addrow button {
+  background: #0ecb81;
+  color: #06231a;
+  border: none;
+  border-radius: 5px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.addrow button:disabled { opacity: 0.5; cursor: default; }
+.addmsg { font-size: 11px; color: #8b95a1; min-height: 14px; margin-top: 4px; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #1b222c;
+  border: 1px solid #2a3441;
+  border-radius: 5px;
+  padding: 2px 4px 2px 8px;
+  font-size: 11px;
+  color: #cdd3da;
+}
+.chip-x {
+  background: transparent;
+  border: none;
+  color: #8b95a1;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+.chip-x:hover:not(:disabled) { color: #f6465d; }
+.chip-x:disabled { opacity: 0.3; cursor: default; }
 
 .perp {
   background: #2a3441;

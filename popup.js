@@ -4,8 +4,8 @@ import {
 } from './format.js';
 // LightweightCharts is loaded as a global by vendor/lightweight-charts...js (classic script).
 
-const SYMBOLS = { BTCUSDT: 'BTC', ETHUSDT: 'ETH', SPCXUSDT: 'SPCX', BNBUSDT: 'BNB', XAUUSDT: 'XAU' };
-const DEFAULT_SYMBOL = 'BTCUSDT';
+const DEFAULT_SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SPCXUSDT', 'BNBUSDT', 'XAUUSDT'];
+const labelOf = (s) => s.replace(/USDT$/, ''); // BTCUSDT -> BTC
 
 // Standard candle intervals (like any trading app), each showing ~120 candles.
 const TF = {
@@ -21,7 +21,8 @@ const premiumUrl = (s) => `https://fapi.binance.com/fapi/v1/premiumIndex?symbol=
 const klinesUrl = (s, interval, limit) =>
   `https://fapi.binance.com/fapi/v1/klines?symbol=${s}&interval=${interval}&limit=${limit}`;
 
-let currentSymbol = DEFAULT_SYMBOL;
+let symbols = DEFAULT_SYMBOLS.slice();
+let currentSymbol = DEFAULT_SYMBOLS[0];
 let currentTf = '5m';
 let snap = null;
 let lastWsAt = 0;
@@ -193,8 +194,7 @@ function setActive(barId, predicate) {
   [...$(barId).querySelectorAll('button')].forEach((b) => b.classList.toggle('active', predicate(b)));
 }
 
-function switchSymbol(sym) {
-  if (sym === currentSymbol) return;
+function applySymbol(sym) {
   currentSymbol = sym;
   setActive('symbar', (b) => b.dataset.sym === sym);
   chrome.storage.local.set({ symbol: sym }); // background + offscreen follow this
@@ -205,10 +205,120 @@ function switchSymbol(sym) {
   loadChart(currentSymbol, currentTf);
 }
 
+function switchSymbol(sym) {
+  if (sym === currentSymbol) return;
+  applySymbol(sym);
+}
+
+// ---- user-managed symbol list ----
+
+function persistSymbols() {
+  chrome.storage.local.set({ symbols });
+}
+
+function renderSymbar() {
+  const bar = $('symbar');
+  bar.innerHTML = '';
+  for (const sym of symbols) {
+    const b = document.createElement('button');
+    b.dataset.sym = sym;
+    b.textContent = labelOf(sym);
+    if (sym === currentSymbol) b.classList.add('active');
+    bar.appendChild(b);
+  }
+  const add = document.createElement('button');
+  add.className = 'manage-toggle';
+  add.textContent = '＋';
+  add.title = '管理标的';
+  bar.appendChild(add);
+}
+
+function renderChips() {
+  const box = $('chips');
+  box.innerHTML = '';
+  for (const sym of symbols) {
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    const name = document.createElement('span');
+    name.textContent = labelOf(sym);
+    const x = document.createElement('button');
+    x.className = 'chip-x';
+    x.dataset.sym = sym;
+    x.textContent = '×';
+    x.title = '删除';
+    x.disabled = symbols.length <= 1; // keep at least one
+    chip.appendChild(name);
+    chip.appendChild(x);
+    box.appendChild(chip);
+  }
+}
+
+function showAddMsg(text) {
+  $('addMsg').textContent = text || '';
+}
+
+function toggleManage() {
+  const m = $('manage');
+  if (m.hasAttribute('hidden')) {
+    renderChips();
+    m.removeAttribute('hidden');
+    $('symInput').focus();
+  } else {
+    m.setAttribute('hidden', '');
+    showAddMsg('');
+  }
+}
+
+async function validateSymbol(sym) {
+  try {
+    const r = await fetch(`https://fapi.binance.com/fapi/v1/ticker/price?symbol=${sym}`);
+    if (!r.ok) return false;
+    const j = await r.json();
+    return j && j.price != null;
+  } catch { return false; }
+}
+
+async function addSymbol() {
+  let s = $('symInput').value.trim().toUpperCase();
+  if (!s) return;
+  if (!/USDT$/.test(s)) s += 'USDT';
+  if (symbols.includes(s)) { showAddMsg(labelOf(s) + ' 已存在'); return; }
+  $('addBtn').disabled = true;
+  showAddMsg('验证中…');
+  const ok = await validateSymbol(s);
+  $('addBtn').disabled = false;
+  if (!ok) { showAddMsg('找不到该 U 本位永续:' + s); return; }
+  symbols.push(s);
+  persistSymbols();
+  $('symInput').value = '';
+  showAddMsg('已添加 ' + labelOf(s));
+  renderSymbar();
+  renderChips();
+}
+
+function removeSymbol(sym) {
+  if (symbols.length <= 1) return;
+  const i = symbols.indexOf(sym);
+  if (i === -1) return;
+  symbols.splice(i, 1);
+  persistSymbols();
+  if (sym === currentSymbol) applySymbol(symbols[0]); // selected removed -> first left
+  renderSymbar();
+  renderChips();
+}
+
 function initBars() {
   $('symbar').addEventListener('click', (e) => {
     const b = e.target.closest('button');
-    if (b) switchSymbol(b.dataset.sym);
+    if (!b) return;
+    if (b.classList.contains('manage-toggle')) { toggleManage(); return; }
+    if (b.dataset.sym) switchSymbol(b.dataset.sym);
+  });
+  $('addBtn').addEventListener('click', addSymbol);
+  $('symInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') addSymbol(); });
+  $('chips').addEventListener('click', (e) => {
+    const x = e.target.closest('.chip-x');
+    if (x && x.dataset.sym) removeSymbol(x.dataset.sym);
   });
   $('tf').addEventListener('click', (e) => {
     const b = e.target.closest('button');
@@ -224,12 +334,14 @@ function initBars() {
 async function init() {
   initBars();
 
-  // restore saved symbol
+  // restore saved symbol list + selection
   try {
-    const { symbol } = await chrome.storage.local.get('symbol');
-    if (symbol && SYMBOLS[symbol]) currentSymbol = symbol;
+    const st = await chrome.storage.local.get(['symbols', 'symbol']);
+    if (Array.isArray(st.symbols) && st.symbols.length) symbols = st.symbols;
+    else persistSymbols(); // seed defaults on first run
+    currentSymbol = (st.symbol && symbols.includes(st.symbol)) ? st.symbol : symbols[0];
   } catch {}
-  setActive('symbar', (b) => b.dataset.sym === currentSymbol);
+  renderSymbar();
 
   // instant render from the background's cached snapshot (same symbol only)
   try {

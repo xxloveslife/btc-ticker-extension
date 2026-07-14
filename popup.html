@@ -7,16 +7,18 @@
 <body>
   <div class="header">
     <div class="toprow">
-      <div class="symbar" id="symbar">
-        <button data-sym="BTCUSDT" class="active">BTC</button>
-        <button data-sym="ETHUSDT">ETH</button>
-        <button data-sym="SPCXUSDT">SPCX</button>
-        <button data-sym="BNBUSDT">BNB</button>
-        <button data-sym="XAUUSDT">XAU</button>
-      </div>
+      <div class="symbar" id="symbar"></div>
       <div class="status">
         <span class="perp">永续</span><span id="dot" class="dot"></span><span id="src" class="src"></span>
       </div>
+    </div>
+    <div class="manage" id="manage" hidden>
+      <div class="addrow">
+        <input id="symInput" placeholder="输入代码,如 DOGE 或 DOGEUSDT" maxlength="20" autocomplete="off" />
+        <button id="addBtn">添加</button>
+      </div>
+      <div class="addmsg" id="addMsg"></div>
+      <div class="chips" id="chips"></div>
     </div>
     <div class="price" id="price">--</div>
     <div class="change" id="change">--</div>

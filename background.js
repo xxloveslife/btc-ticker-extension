@@ -6,13 +6,6 @@ import {
   fundingCountdown, isStale, UP, DOWN, STALE,
 } from './format.js';
 
-const SYMBOLS = {
-  BTCUSDT: { label: 'BTC' },
-  ETHUSDT: { label: 'ETH' },
-  SPCXUSDT: { label: 'SPCX' },
-  BNBUSDT: { label: 'BNB' },
-  XAUUSDT: { label: 'XAU' },
-};
 const DEFAULT_SYMBOL = 'BTCUSDT';
 const STALE_MS = 10000;
 
@@ -38,7 +31,7 @@ const streamUrl = (s) =>
   `wss://fstream.binance.com/stream?streams=${lower(s)}@ticker/${lower(s)}@markPrice@1s`;
 const tickerUrl = (s) => `https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=${s}`;
 const premiumUrl = (s) => `https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${s}`;
-const labelOf = (s) => (SYMBOLS[s] && SYMBOLS[s].label) || s;
+const labelOf = (s) => (s || '').replace(/USDT$/, ''); // BTCUSDT -> BTC
 
 function persist() {
   chrome.storage.session.set({ snap }).catch(() => {});
@@ -177,7 +170,7 @@ async function ensureOffscreen() {
 // ---- Symbol switching ----
 
 function setSymbol(newSym) {
-  if (!SYMBOLS[newSym] || newSym === symbol) return;
+  if (!newSym || newSym === symbol) return;
   symbol = newSym;
   snap = freshSnap(symbol);
   applyBadge();          // show "—" immediately, no stale cross-symbol price
@@ -213,7 +206,7 @@ chrome.runtime.onMessage.addListener((req, _sender, sendResponse) => {
 
 // Kick off on every worker start: load the saved symbol, then connect + poll.
 chrome.storage.local.get('symbol').then((res) => {
-  if (res && res.symbol && SYMBOLS[res.symbol]) symbol = res.symbol;
+  if (res && res.symbol) symbol = res.symbol;
   snap = freshSnap(symbol);
   ensureConnected();
   ensureOffscreen();
