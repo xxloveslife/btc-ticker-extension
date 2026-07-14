@@ -32,6 +32,7 @@ let chart = null;
 let series = null;
 let emaSeries = null;
 let chartLoadSeq = 0; // only the latest loadChart() may render (race guard)
+let lastBar = null;   // latest candle {time,open,high,low,close}, updated live
 
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -60,7 +61,9 @@ function renderSnap() {
   $('dot').className = 'dot' + (fresh ? ' live' : '');
   const src = $('src');
   if (wsLive()) { src.textContent = 'WS实时'; src.className = 'src ws'; }
-  else { src.textContent = '轮询5s'; src.className = 'src'; }
+  else { src.textContent = '轮询2s'; src.className = 'src'; }
+
+  if (snap.price != null) updateLiveCandle(snap.price);
 }
 
 function renderCountdown() {
@@ -170,6 +173,7 @@ async function loadChart(sym, tf) {
         if (ema[i] != null) emaData.push({ time: data[i].time, value: ema[i] });
       }
       emaSeries.setData(emaData);
+      lastBar = data.length ? { ...data[data.length - 1] } : null;
 
       // Reset both axes — without this, a manually-dragged price scale stays
       // pinned to the previous symbol's range and the new candles render
@@ -188,6 +192,26 @@ async function loadChart(sym, tf) {
       }
     }
   }
+}
+
+// Keep the last candle in sync with the live price (REST-polled), so the chart's
+// current bar tracks the header price. Rolls into a new candle when the interval
+// bucket changes. Times use the same local-shift as loadChart.
+function updateLiveCandle(price) {
+  if (!series || !lastBar || !isFinite(price)) return;
+  const intervalSec = intervalToMs(TF[currentTf].interval) / 1000;
+  if (!intervalSec) return;
+  const utcBucket = Math.floor(Date.now() / 1000 / intervalSec) * intervalSec;
+  const bucketTime = utcBucket - new Date().getTimezoneOffset() * 60;
+  if (bucketTime < lastBar.time) return;
+  if (bucketTime === lastBar.time) {
+    lastBar.close = price;
+    if (price > lastBar.high) lastBar.high = price;
+    if (price < lastBar.low) lastBar.low = price;
+  } else {
+    lastBar = { time: bucketTime, open: price, high: price, low: price, close: price };
+  }
+  series.update(lastBar);
 }
 
 function setActive(barId, predicate) {
@@ -364,7 +388,7 @@ async function init() {
   });
 
   loadRestSnapshot();
-  setInterval(loadRestSnapshot, 5000);
+  setInterval(loadRestSnapshot, 2000);
   setInterval(renderCountdown, 1000);
   renderCandleCountdown();
   setInterval(renderCandleCountdown, 1000);
