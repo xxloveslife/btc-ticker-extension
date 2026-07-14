@@ -90,8 +90,8 @@ async function loadRestSnapshot() {
   const sym = currentSymbol;
   try {
     const [t, p] = await Promise.all([
-      fetch(tickerUrl(sym)).then((r) => r.json()),
-      fetch(premiumUrl(sym)).then((r) => r.json()),
+      fetch(tickerUrl(sym), { cache: 'no-store' }).then((r) => r.json()),
+      fetch(premiumUrl(sym), { cache: 'no-store' }).then((r) => r.json()),
     ]);
     if (sym !== currentSymbol) return; // user switched mid-fetch
     snap = {
@@ -145,7 +145,7 @@ async function loadChart(sym, tf) {
 
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const res = await fetch(klinesUrl(sym, cfg.interval, cfg.limit));
+      const res = await fetch(klinesUrl(sym, cfg.interval, cfg.limit), { cache: 'no-store' });
       if (myId !== chartLoadSeq) return; // superseded by a newer switch
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const raw = await res.json();

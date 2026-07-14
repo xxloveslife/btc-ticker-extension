@@ -10,8 +10,8 @@ async function poll() {
   try {
     const { symbol = 'BTCUSDT' } = await chrome.storage.local.get('symbol');
     const [t, p] = await Promise.all([
-      fetch(tickerUrl(symbol)).then((r) => r.json()),
-      fetch(premiumUrl(symbol)).then((r) => r.json()),
+      fetch(tickerUrl(symbol), { cache: 'no-store' }).then((r) => r.json()),
+      fetch(premiumUrl(symbol), { cache: 'no-store' }).then((r) => r.json()),
     ]);
     chrome.runtime.sendMessage({ type: 'quote', symbol, t, p });
   } catch (e) {

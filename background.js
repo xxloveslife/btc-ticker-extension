@@ -145,8 +145,8 @@ async function pollRest() {
   const sym = symbol;
   try {
     const [t, p] = await Promise.all([
-      fetch(tickerUrl(sym)).then((r) => r.json()),
-      fetch(premiumUrl(sym)).then((r) => r.json()),
+      fetch(tickerUrl(sym), { cache: 'no-store' }).then((r) => r.json()),
+      fetch(premiumUrl(sym), { cache: 'no-store' }).then((r) => r.json()),
     ]);
     applyQuote(sym, t, p);
   } catch (e) {
