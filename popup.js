@@ -37,6 +37,14 @@ let lastBar = null;   // latest candle {time,open,high,low,close}, updated live
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// 同一个页面既作工具栏弹窗、也作独立窗口(?w=1)
+const isWindow = new URLSearchParams(location.search).get('w') === '1';
+
+function fitChart() {
+  const el = $('chart');
+  if (chart && el && el.clientWidth) chart.resize(el.clientWidth, el.clientHeight);
+}
+
 function wsLive() {
   return Date.now() - lastWsAt < 6000;
 }
@@ -355,7 +363,22 @@ function initBars() {
   $('chartMsg').addEventListener('click', () => loadChart(currentSymbol, currentTf));
 }
 
+function initWindowMode() {
+  if (isWindow) {
+    document.body.classList.add('windowed');
+    const d = $('detach');
+    if (d) d.remove(); // 已经在独立窗口里了
+    window.addEventListener('resize', fitChart);
+  } else {
+    $('detach').addEventListener('click', () => {
+      chrome.runtime.sendMessage({ type: 'openWindow' });
+      window.close(); // 关掉工具栏弹窗,避免两份界面重复轮询
+    });
+  }
+}
+
 async function init() {
+  initWindowMode();
   initBars();
 
   // restore saved symbol list + selection

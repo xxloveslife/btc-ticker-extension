@@ -198,8 +198,67 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
+// ---- 独立可拖动窗口 ----
+// 工具栏弹窗锚定在图标上且失焦即关,无法拖动;独立窗口是真正的 OS 窗口,
+// 可拖到任意位置/显示器并常驻。位置与大小记忆在 storage.local。
+
+const WIN_DEFAULT = { width: 380, height: 620 };
+
+async function trackedWindowId() {
+  try {
+    const { winId } = await chrome.storage.session.get('winId');
+    if (winId == null) return null;
+    await chrome.windows.get(winId); // 已关闭则抛错
+    return winId;
+  } catch { return null; }
+}
+
+async function openDetachedWindow() {
+  const existing = await trackedWindowId();
+  if (existing != null) {
+    try { await chrome.windows.update(existing, { focused: true, drawAttention: true }); return; } catch {}
+  }
+  let b = {};
+  try {
+    const { winBounds } = await chrome.storage.local.get('winBounds');
+    if (winBounds && Number.isFinite(winBounds.width)) b = winBounds;
+  } catch {}
+  const opts = {
+    url: chrome.runtime.getURL('popup.html?w=1'),
+    type: 'popup',
+    width: b.width || WIN_DEFAULT.width,
+    height: b.height || WIN_DEFAULT.height,
+  };
+  // 负数/超出主屏的坐标是合法的(第二显示器),原样恢复
+  if (Number.isFinite(b.left) && Number.isFinite(b.top)) { opts.left = b.left; opts.top = b.top; }
+  try {
+    const win = await chrome.windows.create(opts);
+    chrome.storage.session.set({ winId: win.id });
+  } catch (e) {
+    console.log('[btc] open window failed', e);
+  }
+}
+
+chrome.windows.onRemoved.addListener((id) => {
+  chrome.storage.session.get('winId').then(({ winId }) => {
+    if (winId === id) chrome.storage.session.remove('winId');
+  });
+});
+
+if (chrome.windows.onBoundsChanged) {
+  chrome.windows.onBoundsChanged.addListener((win) => {
+    chrome.storage.session.get('winId').then(({ winId }) => {
+      if (winId !== win.id) return;
+      chrome.storage.local.set({
+        winBounds: { left: win.left, top: win.top, width: win.width, height: win.height },
+      });
+    });
+  });
+}
+
 chrome.runtime.onMessage.addListener((req, _sender, sendResponse) => {
   if (req && req.type === 'quote') { applyQuote(req.symbol, req.t, req.p); return false; }
+  if (req && req.type === 'openWindow') { openDetachedWindow(); return false; }
   if (req && req.type === 'getSnap') { sendResponse({ snap }); return false; }
   return false;
 });
